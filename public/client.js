@@ -8,6 +8,7 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// Global variables for key, page, and WebSocket
 const key = new URLSearchParams(window.location.search).get('key');
 const page = new URLSearchParams(window.location.search).get('page') || '1';
 const ws = new WebSocket(`ws://${window.location.host}?key=${key}&page=${page}`);
@@ -25,7 +26,7 @@ ws.onmessage = event => {
 };
 
 function createPostElement(post) {
-    const isImage = post.text.match(/\.(jpeg|jpg|gif|png|webp)/i) != null;
+    const isImage = post.text.match(/\.(jpeg|jpg|gif|png|webp|avif|bmp)(\?|$)/i) != null || post.text.includes('pbs.twimg.com/media/');
     const content = isImage
         ? `<a href="${post.text}" target="_blank"><img src="${post.text}" loading="lazy"></a>`
         : post.text.includes('http')
@@ -49,15 +50,17 @@ async function submitPost(e) {
     const input = document.getElementById('postInput');
     const text = input.value;
 
+    if (!text) return; // Do not submit if input is empty
+
     try {
-        const res = await fetch(`/api/posts?key=${key}`, { // Ensure 'key' is accessible
+        const res = await fetch(`/api/posts?key=${key}`, { // 'key' is now accessible
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text })
         });
         if (res.ok) {
             input.value = '';
-            input.placeholder = "What's on your mind?"; // Reset placeholder on successful post
+            input.placeholder = "What's on your mind?";
         } else {
             console.error('Post submission failed:', res.statusText);
             input.placeholder = "Submission failed. Please try again.";
@@ -116,6 +119,13 @@ if (postForm && postInput) {
         // Only reset if it's an error message
         if (postInput.placeholder.includes('failed')) {
             postInput.placeholder = "What's on your mind?";
+        }
+    });
+
+    // Blur postInput when clicking outside of it or its form
+    document.addEventListener('click', (e) => {
+        if (!postInput.contains(e.target) && !postForm.contains(e.target)) {
+            postInput.blur();
         }
     });
 }

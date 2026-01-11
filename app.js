@@ -4,7 +4,7 @@ const path = require("path");
 module.exports = function (posts, key, isEdit, hasOlder, hasNewer, page) {
   const postItems = posts
     .map((post) => {
-      const isImage = post.text.match(/\.(jpeg|jpg|gif|png|webp)/i) != null;
+      const isImage = post.text.match(/\.(jpeg|jpg|gif|png|webp|avif|bmp)(\?|$)/i) != null || post.text.includes('pbs.twimg.com/media/');
       const content = isImage
         ? `<a href="${post.text}" target="_blank"><img src="${post.text}" loading="lazy"></a>`
         : post.text.includes("http")

@@ -6,6 +6,7 @@ const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const sanitizeHtml = require('sanitize-html');
 const generateHTML = require("./app.js");
 const app = express();
 
@@ -48,16 +49,16 @@ app.use((err, req, res, next) => {
 });
 
 const checkAuth = (req, res, next) => {
-  const key = req.query.key || req.headers["x-api-key"];
-  if (key === process.env.PRIVATE_KEY) {
-    req.isEdit = true;
-    next();
-  } else if (key === process.env.PUBLIC_KEY) {
-    req.isEdit = false;
-    if (req.method === "POST") {
-      return res.status(403).send("Unauthorized");
-    }
-    next();
+    const key = req.query.key || req.headers['x-api-key'];
+    if (key === process.env.PRIVATE_KEY) {
+        req.isEdit = true;
+        next();
+    } else if (key === process.env.PUBLIC_KEY) {
+        req.isEdit = false;
+        if (req.method === 'POST') {
+            return res.status(403).send('Unauthorized');
+        }
+        next();
     } else {
         const errorPage = fs.readFileSync(path.join(__dirname, 'public', 'templates', '403.html'), 'utf8');
         res.status(403).send(errorPage);
@@ -65,13 +66,18 @@ const checkAuth = (req, res, next) => {
 };
 
 const db = {
-  get: (file) =>
-    JSON.parse(fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "[]"),
-  save: (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2)),
+  get: () => inMemoryPosts, // Read from memory
+  save: (file, data) => {
+    inMemoryPosts = data; // Update memory
+    fs.writeFileSync(file, JSON.stringify(data, null, 2)); // Write to disk
+  },
 };
 
+// Load initial posts into memory
+let inMemoryPosts = JSON.parse(fs.existsSync('posts.json') ? fs.readFileSync('posts.json', 'utf8') : '[]');
+
 app.get("/", checkAuth, (req, res) => {
-  const allPosts = db.get("posts.json");
+  const allPosts = db.get(); // Use the in-memory cache
   const postsPerPage = 10;
   const totalPages = Math.ceil(allPosts.length / postsPerPage);
   let page = parseInt(req.query.page || "1", 10);
@@ -98,9 +104,13 @@ app.post("/api/upload", checkAuth, upload.single("image"), (req, res) => {
 });
 
 app.post("/api/posts", checkAuth, (req, res) => {
-  const posts = db.get("posts.json");
+  const posts = db.get(); // Use the in-memory cache
+  const sanitizedText = sanitizeHtml(req.body.text, {
+    allowedTags: [],
+    allowedAttributes: {},
+  });
   const newPost = {
-    text: req.body.text,
+    text: sanitizedText,
     timestamp: new Date().toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
@@ -108,7 +118,7 @@ app.post("/api/posts", checkAuth, (req, res) => {
     }),
   };
   posts.unshift(newPost);
-  db.save("posts.json", posts);
+  db.save("posts.json", posts); // This will update both memory and disk
 
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
