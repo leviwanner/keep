@@ -74,7 +74,21 @@ PUBLIC_KEY=YOUR_SUPER_SECRET_VIEW_KEY
 
 **Remember to replace `YOUR_SUPER_SECRET_EDIT_KEY` and `YOUR_SUPER_SECRET_VIEW_KEY` with strong, unique keys of your choice. I recommend using a tool like this [password generator](https://1password.com/password-generator)**
 
-### 4. Project Structure (Overview)
+### 4. Ensure Uploads Directory is Available
+
+Create a `uploads` directory to store user-uploaded images and other media files.
+This directory must exist and be writable by the application at runtime.
+
+```bash
+mkdir -p keep/public/uploads
+```
+
+**Notes:**
+
+- The `uploads` directory is served as a public static path.
+- Ensure proper write permissions for the server process.
+
+### 5. Project Structure (Overview)
 
 ```
 keep-journal/
@@ -93,7 +107,7 @@ keep-journal/
 └── .env                   # Environment variables (keys, VAPID)
 ```
 
-### 5. Start the Server
+### 6. Start the Server
 
 ```bash
 node server.js
