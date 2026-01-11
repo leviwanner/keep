@@ -1,0 +1,32 @@
+# Node.js
+node_modules/
+npm-debug.log
+.env
+posts.json
+subscriptions.json
+/public/uploads/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+*.pnp.*
+.pnp-debug.*
+
+# Miscellaneous
+.DS_Store
+*.sublime-*
+.vscode/
+
+# Build artifacts
+build/
+dist/
+tmp/
+
+# ngrok (even though we're not using it, good to exclude by default)
+.ngrok2/
