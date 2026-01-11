@@ -8,8 +8,21 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// PWA key persistence logic
+let key = new URLSearchParams(window.location.search).get('key');
+const savedKey = localStorage.getItem('apiKey');
+
+if (key) {
+  // Key is in the URL. Use it and save it for future PWA launches.
+  localStorage.setItem('apiKey', key);
+} else if (savedKey) {
+  // No key in URL, but we have one saved. Redirect to the URL with the saved key.
+  // This will only run once on PWA startup before the rest of the script executes.
+  window.location.href = `/?key=${savedKey}`;
+}
+// ---
+
 // Global variables for key, page, and WebSocket
-const key = new URLSearchParams(window.location.search).get('key');
 const page = new URLSearchParams(window.location.search).get('page') || '1';
 const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
 const ws = new WebSocket(`${wsProtocol}${window.location.host}?key=${key}&page=${page}`);
