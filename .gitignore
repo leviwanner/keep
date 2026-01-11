@@ -30,3 +30,6 @@ tmp/
 
 # ngrok (even though we're not using it, good to exclude by default)
 .ngrok2/
+
+# MD files
+FUTURE.md

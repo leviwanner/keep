@@ -1,4 +1,3 @@
-console.log('client.js is running!');
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').then(registration => {
@@ -12,7 +11,8 @@ if ('serviceWorker' in navigator) {
 // Global variables for key, page, and WebSocket
 const key = new URLSearchParams(window.location.search).get('key');
 const page = new URLSearchParams(window.location.search).get('page') || '1';
-const ws = new WebSocket(`ws://${window.location.host}?key=${key}&page=${page}`);
+const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+const ws = new WebSocket(`${wsProtocol}${window.location.host}?key=${key}&page=${page}`);
 
 ws.onmessage = event => {
     if (page === '1') {
