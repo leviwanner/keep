@@ -28,7 +28,7 @@ module.exports = function (posts, key, isEdit, hasOlder, hasNewer, page) {
   const form = isEdit
     ? `
         <form id="postForm">
-            <input type="text" name="input" id="postInput" placeholder="What's on your mind?" required />
+            <input type="text" id="postInput" placeholder="What's on your mind?" required />
             <button type="submit">Share</button>
         </form>
     `

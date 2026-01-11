@@ -1,3 +1,4 @@
+console.log('client.js is running!');
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').then(registration => {
