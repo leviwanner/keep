@@ -1,3 +1,4 @@
+// Define the cache name and the URLs to be cached.
 const CACHE_NAME = 'keep-journal-cache-v3';
 const urlsToCache = [
   '/',
@@ -9,7 +10,9 @@ const urlsToCache = [
   '/static/favicon.ico'
 ];
 
+// Install event: triggered when the service worker is first installed.
 self.addEventListener('install', event => {
+  // Wait until the cache is opened and all specified URLs are cached.
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -19,15 +22,18 @@ self.addEventListener('install', event => {
   );
 });
 
+// Fetch event: triggered for every network request made by the page.
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Strategy for API calls: Network-first, then cache
+  // Network-first strategy for API calls.
+  // This ensures that the user always gets the latest data from the server.
+  // If the network request fails, it falls back to the cache.
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          // Clone the response to put one in cache and return one
+          // Clone the response to store it in the cache while also returning it to the browser.
           const responseToCache = response.clone();
           caches.open(CACHE_NAME)
             .then(cache => {
@@ -36,14 +42,16 @@ self.addEventListener('fetch', event => {
           return response;
         })
         .catch(() => {
-          // If network fails, try to get from cache
+          // If the network request fails, try to serve the response from the cache.
           return caches.match(event.request);
         })
     );
-    return; // Don't fall through to other handlers
+    return;
   }
 
-  // Strategy for Static assets (URLs to cache): Cache-first, then network
+  // Cache-first strategy for static assets.
+  // This serves assets from the cache if they are available, which makes the app load faster.
+  // If an asset is not in the cache, it is fetched from the network.
   event.respondWith(
     caches.match(event.request)
       .then(response => {
@@ -55,8 +63,10 @@ self.addEventListener('fetch', event => {
   );
 });
 
+// Activate event: triggered when the service worker is activated.
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
+  // Remove old caches to free up space.
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(

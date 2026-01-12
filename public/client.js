@@ -1,35 +1,43 @@
+// Register the service worker if available in the browser.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js");
   });
 }
 
-// Initialize currentPage from the URL
+// --- GLOBAL STATE ---
+
+// Initialize the current page number from the URL parameters.
 const urlParams = new URLSearchParams(window.location.search);
 let currentPage = parseInt(urlParams.get("page") || "1", 10);
+// To store the user's role (e.g., 'edit' or 'view').
 let currentUserRole = null;
 
-// --- Main App Logic ---
+// --- APPLICATION INITIALIZATION ---
 
+// Main function to initialize the application.
 async function initializeApp() {
   try {
+    // Check the user's session status with the server.
     const res = await fetch("/api/session");
     const data = await res.json();
+    // If the user is logged in, set up the main application.
     if (data.loggedIn) {
       currentUserRole = data.role;
-      renderMainLayout(); // Render the main app structure
-      await fetchAndRenderPosts(currentPage);
-      setupWebSocket();
+      renderMainLayout(); // Render the main UI structure.
+      await fetchAndRenderPosts(currentPage); // Fetch and display posts.
+      setupWebSocket(); // Establish a WebSocket connection.
     } else {
+      // If the user is not logged in, display the login form.
       renderLogin();
     }
   } catch (error) {
     console.error("Could not verify session", error);
-    renderLogin();
+    renderLogin(); // Fallback to login form on error.
   }
 }
 
-// Function to render the overall app structure (called once on login/session check)
+// Renders the basic HTML structure of the main application.
 function renderMainLayout() {
   const container = document.querySelector(".container");
   container.innerHTML = `
@@ -40,14 +48,15 @@ function renderMainLayout() {
             <a href="#" id="logout">Close space</a>
         </div>
     `;
-  // Attach event listener for the logout button only once
+  // Add a one-time event listener for the logout button.
   document.getElementById("logout").addEventListener("click", async (e) => {
     e.preventDefault();
     await fetch("/api/logout", { method: "POST" });
-    renderLogin();
+    window.location.reload(); // Reload the page to show the login screen.
   });
 }
 
+// Renders the login form.
 function renderLogin() {
   const container = document.querySelector(".container");
   container.innerHTML = `
@@ -69,12 +78,14 @@ function renderLogin() {
             </form>
         </div>
     `;
+  // Add an event listener for the login form submission.
   document.getElementById("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const apiKey = document.getElementById("apiKeyInput").value;
     const rememberMe = document.getElementById("rememberMe").checked;
 
     try {
+      // Send the login request to the server.
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,11 +93,8 @@ function renderLogin() {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        currentUserRole = data.role;
-        renderMainLayout(); // Render the main app structure
-        await fetchAndRenderPosts(currentPage);
-        setupWebSocket();
+        // If login is successful, initialize the main application.
+        initializeApp();
       } else {
         alert("Login failed: Invalid Key");
       }
@@ -96,20 +104,25 @@ function renderLogin() {
   });
 }
 
+// --- RENDERING LOGIC ---
+
+// Fetches posts from the server and triggers the rendering process.
 async function fetchAndRenderPosts(page) {
   try {
     const res = await fetch(`/api/posts?page=${page}`);
     if (!res.ok) throw new Error("Failed to fetch posts");
 
     const data = await res.json();
-    renderApp(data);
+    renderApp(data); // Render the application with the fetched data.
   } catch (error) {
     console.error("Error fetching posts:", error);
   }
 }
 
+// Renders the main application components (form, feed, pagination).
 function renderApp(data) {
   const formContainer = document.getElementById("form-container");
+  // Display the post creation form only if the user has "edit" rights.
   if (data.isEdit && formContainer) {
     formContainer.innerHTML = `
             <form id="postForm">
@@ -117,23 +130,22 @@ function renderApp(data) {
                 <button type="submit">Share</button>
             </form>
         `;
-    setupFormEventListeners();
+    setupFormEventListeners(); // Set up event listeners for the form.
   } else if (formContainer) {
-    formContainer.innerHTML = ""; // Clear form container if not in edit mode
+    formContainer.innerHTML = ""; // Clear the form container if not in edit mode.
   }
 
+  // Render the feed of posts.
   const feed = document.getElementById("feed");
   if (feed) {
     feed.innerHTML = data.posts.map(createPostElement).join("");
   }
 
-  // Render pagination
+  // Render the pagination controls.
   const archiveContainer = document.getElementById("archive-container");
   if (archiveContainer) {
-    // Determine if we need to display the archive bar at all
+    // Display pagination only if there are older or newer pages.
     if (data.hasOlder || data.hasNewer) {
-      // Use empty placeholders (<div></div>) if a link isn't present
-      // to maintain the 3-column grid structure.
       const olderLink = data.hasOlder
         ? `<a href="#" id="older">Older</a>`
         : "<div></div>";
@@ -141,7 +153,6 @@ function renderApp(data) {
         ? `<a href="#" id="newer">Newer</a>`
         : "<div></div>";
       const spacer = `<div class="spacer"></div>`;
-      // Reconstruct the innerHTML with the spacer always in the middle
       archiveContainer.innerHTML = `
         <div class="archive">
           ${olderLink}
@@ -149,15 +160,15 @@ function renderApp(data) {
           ${newerLink}
         </div>`;
     } else {
-      // Remove the bar entirely if no pagination is needed
-      archiveContainer.innerHTML = "";
+      archiveContainer.innerHTML = ""; // Clear pagination if not needed.
     }
-    setupPaginationEventListeners(data);
+    setupPaginationEventListeners(data); // Set up event listeners for pagination.
   }
 }
 
-// --- Event Listeners & Element Creation ---
+// --- EVENT LISTENERS & DOM MANIPULATION ---
 
+// Sets up event listeners for the post creation form.
 function setupFormEventListeners() {
   const postForm = document.getElementById("postForm");
   const postInput = document.getElementById("postInput");
@@ -166,11 +177,12 @@ function setupFormEventListeners() {
   postForm.addEventListener("submit", submitPost);
   postInput.addEventListener("paste", handlePaste);
 
-  // Re-add listeners to manage placeholder text
+  // Resets the placeholder text on focus.
   postInput.addEventListener("focus", () => {
     postInput.placeholder = "What's on your mind?";
   });
 
+  // Resets the placeholder text on input, in case of a previous error message.
   postInput.addEventListener("input", () => {
     if (postInput.placeholder.includes("failed")) {
       postInput.placeholder = "What's on your mind?";
@@ -178,6 +190,7 @@ function setupFormEventListeners() {
   });
 }
 
+// Sets up event listeners for the pagination controls.
 function setupPaginationEventListeners(data) {
   const olderButton = document.getElementById("older");
   if (olderButton) {
@@ -185,7 +198,7 @@ function setupPaginationEventListeners(data) {
       e.preventDefault();
       currentPage = data.page + 1;
       fetchAndRenderPosts(currentPage);
-      // Update URL without reloading
+      // Update the URL to reflect the new page number.
       history.pushState({ page: currentPage }, "", `/?page=${currentPage}`);
     });
   }
@@ -196,12 +209,13 @@ function setupPaginationEventListeners(data) {
       e.preventDefault();
       currentPage = data.page - 1;
       fetchAndRenderPosts(currentPage);
-      // Update URL without reloading
+      // Update the URL to reflect the new page number.
       history.pushState({ page: currentPage }, "", `/?page=${currentPage}`);
     });
   }
 }
 
+// Handles the submission of a new post.
 async function submitPost(e) {
   e.preventDefault();
   const input = document.getElementById("postInput");
@@ -215,7 +229,7 @@ async function submitPost(e) {
       body: JSON.stringify({ text }),
     });
     if (res.ok) {
-      input.value = "";
+      input.value = ""; // Clear the input field on successful submission.
     } else {
       console.error("Post submission failed");
     }
@@ -224,6 +238,7 @@ async function submitPost(e) {
   }
 }
 
+// Handles pasting content into the post input, specifically for uploading images.
 async function handlePaste(e) {
   const items = (e.clipboardData || e.originalEvent.clipboardData).items;
   for (const item of items) {
@@ -240,9 +255,11 @@ async function handlePaste(e) {
         });
         const data = await res.json();
         if (res.ok && data.success) {
+          // If upload is successful, populate the input field with the image URL.
           document.getElementById("postInput").value =
             window.location.origin + data.url;
         } else {
+          // Handle upload failure by displaying a message in the placeholder.
           console.error("Upload failed:", data.message);
           const postInput = document.getElementById("postInput");
           if (postInput) {
@@ -258,16 +275,20 @@ async function handlePaste(e) {
   }
 }
 
+// Creates the HTML element for a single post.
 function createPostElement(post) {
+  // Check if the post text is an image URL.
   const isImage =
     post.text.match(/\.(jpeg|jpg|gif|png|webp|avif|bmp)(\?|$)/i) != null ||
     post.text.includes("pbs.twimg.com/media/");
+  // Create the appropriate HTML content for the post.
   const content = isImage
     ? `<a href="${post.text}" target="_blank"><img src="${post.text}" loading="lazy"></a>`
     : post.text.includes("http")
     ? `<a href="${post.text}" target="_blank">${post.text}</a>`
     : post.text;
 
+  // Return the complete HTML structure for the post.
   return `
         <div class="item">
             <div class="subject">
@@ -277,44 +298,59 @@ function createPostElement(post) {
         </div>`;
 }
 
-// --- WebSocket Logic ---
+// --- WEBSOCKETS ---
 
+// Sets up the WebSocket connection and defines its event handlers.
 function setupWebSocket() {
   const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
   const ws = new WebSocket(`${wsProtocol}${window.location.host}`);
 
+  // Handle incoming messages from the WebSocket server.
   ws.onmessage = (event) => {
+    // If a new post is received and the user is on the first page,
+    // refresh the posts to ensure the view and pagination are up-to-date.
     if (currentPage === 1) {
-      const post = JSON.parse(event.data);
-      const feed = document.getElementById("feed");
-      if (feed) {
-        feed.insertAdjacentHTML("afterbegin", createPostElement(post));
-        if (feed.children.length > 10) {
-          feed.lastChild.remove();
-        }
-      }
+        fetchAndRenderPosts(currentPage);
     }
   };
 
+  // Handle the WebSocket connection closing.
   ws.onclose = () => {
     console.log("WebSocket disconnected. Attempting to reconnect...");
+    // Attempt to reconnect after a 3-second delay.
     setTimeout(setupWebSocket, 3000);
   };
 
+  // Handle WebSocket errors.
   ws.onerror = (err) => {
     console.error("WS: WebSocket error:", err);
   };
 }
 
-// --- Initial Load ---
+// --- PAGE LOAD & BROWSER HISTORY ---
 
-document.addEventListener("DOMContentLoaded", initializeApp);
+// Initial setup when the DOM is fully loaded.
+document.addEventListener("DOMContentLoaded", () => {
+    initializeApp();
 
-// Handle browser back/forward buttons
+    // Add a global click listener to improve UI on mobile devices.
+    document.addEventListener('click', (event) => {
+        // If the user clicks on a non-interactive area, remove focus from the active element.
+        // This is useful for dismissing virtual keyboards on mobile.
+        if (!event.target.closest('input, button, a, [onclick]')) {
+            if (document.activeElement) {
+                document.activeElement.blur();
+            }
+        }
+    });
+});
+
+// Handle the browser's back and forward buttons.
 window.addEventListener("popstate", (event) => {
   const urlParams = new URLSearchParams(window.location.search);
   const pageFromUrl = parseInt(urlParams.get("page") || "1", 10);
 
+  // If the page number in the URL has changed, fetch and render the posts for the new page.
   if (pageFromUrl !== currentPage) {
     currentPage = pageFromUrl;
     fetchAndRenderPosts(currentPage);
