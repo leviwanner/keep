@@ -66,7 +66,8 @@ button:hover {
 }
 .content {
   line-height: 1.4em;
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 .content img {
   width: 100%;

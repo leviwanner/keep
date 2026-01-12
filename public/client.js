@@ -130,20 +130,31 @@ function renderApp(data) {
   // Render pagination
   const archiveContainer = document.getElementById("archive-container");
   if (archiveContainer) {
-    const pageLinks = [];
-    if (data.hasOlder) {
-      pageLinks.push(`<a href="#" id="older">Older</a>`);
+    // Determine if we need to display the archive bar at all
+    if (data.hasOlder || data.hasNewer) {
+      // Use empty placeholders (<div></div>) if a link isn't present
+      // to maintain the 3-column grid structure.
+      const olderLink = data.hasOlder
+        ? `<a href="#" id="older">Older</a>`
+        : "<div></div>";
+      const newerLink = data.hasNewer
+        ? `<a href="#" id="newer">Newer</a>`
+        : "<div></div>";
+      const spacer = `<div class="spacer"></div>`;
+      // Reconstruct the innerHTML with the spacer always in the middle
+      archiveContainer.innerHTML = `
+        <div class="archive">
+          ${olderLink}
+          ${spacer}
+          ${newerLink}
+        </div>`;
+    } else {
+      // Remove the bar entirely if no pagination is needed
+      archiveContainer.innerHTML = "";
     }
-    if (data.hasNewer) {
-      pageLinks.push(`<a href="#" id="newer">Newer</a>`);
-    }
-    // Only render archive div if there are actual links
-    archiveContainer.innerHTML = pageLinks.length > 0 ? `<div class="archive">${pageLinks.join('<div class="spacer"></div>')}</div>` : '';
-
     setupPaginationEventListeners(data);
   }
 }
-
 
 // --- Event Listeners & Element Creation ---
 
@@ -156,12 +167,12 @@ function setupFormEventListeners() {
   postInput.addEventListener("paste", handlePaste);
 
   // Re-add listeners to manage placeholder text
-  postInput.addEventListener('focus', () => {
+  postInput.addEventListener("focus", () => {
     postInput.placeholder = "What's on your mind?";
   });
 
-  postInput.addEventListener('input', () => {
-    if (postInput.placeholder.includes('failed')) {
+  postInput.addEventListener("input", () => {
+    if (postInput.placeholder.includes("failed")) {
       postInput.placeholder = "What's on your mind?";
     }
   });
@@ -175,7 +186,7 @@ function setupPaginationEventListeners(data) {
       currentPage = data.page + 1;
       fetchAndRenderPosts(currentPage);
       // Update URL without reloading
-      history.pushState({ page: currentPage }, '', `/?page=${currentPage}`);
+      history.pushState({ page: currentPage }, "", `/?page=${currentPage}`);
     });
   }
 
@@ -186,7 +197,7 @@ function setupPaginationEventListeners(data) {
       currentPage = data.page - 1;
       fetchAndRenderPosts(currentPage);
       // Update URL without reloading
-      history.pushState({ page: currentPage }, '', `/?page=${currentPage}`);
+      history.pushState({ page: currentPage }, "", `/?page=${currentPage}`);
     });
   }
 }
@@ -235,8 +246,9 @@ async function handlePaste(e) {
           console.error("Upload failed:", data.message);
           const postInput = document.getElementById("postInput");
           if (postInput) {
-            postInput.value = '';
-            postInput.placeholder = data.message || "Upload failed. Please try again.";
+            postInput.value = "";
+            postInput.placeholder =
+              data.message || "Upload failed. Please try again.";
           }
         }
       } catch (error) {
@@ -299,12 +311,12 @@ function setupWebSocket() {
 document.addEventListener("DOMContentLoaded", initializeApp);
 
 // Handle browser back/forward buttons
-window.addEventListener('popstate', (event) => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const pageFromUrl = parseInt(urlParams.get('page') || '1', 10);
-    
-    if (pageFromUrl !== currentPage) {
-        currentPage = pageFromUrl;
-        fetchAndRenderPosts(currentPage);
-    }
+window.addEventListener("popstate", (event) => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const pageFromUrl = parseInt(urlParams.get("page") || "1", 10);
+
+  if (pageFromUrl !== currentPage) {
+    currentPage = pageFromUrl;
+    fetchAndRenderPosts(currentPage);
+  }
 });
