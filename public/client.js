@@ -1,145 +1,310 @@
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(registration => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        }, err => {
-            console.log('ServiceWorker registration failed: ', err);
-        });
-    });
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js");
+  });
 }
 
-// PWA key persistence logic
-let key = new URLSearchParams(window.location.search).get('key');
-const savedKey = localStorage.getItem('apiKey');
+// Initialize currentPage from the URL
+const urlParams = new URLSearchParams(window.location.search);
+let currentPage = parseInt(urlParams.get("page") || "1", 10);
+let currentUserRole = null;
 
-if (key) {
-  // Key is in the URL. Use it and save it for future PWA launches.
-  localStorage.setItem('apiKey', key);
-} else if (savedKey) {
-  // No key in URL, but we have one saved. Redirect to the URL with the saved key.
-  // This will only run once on PWA startup before the rest of the script executes.
-  window.location.href = `/?key=${savedKey}`;
-}
-// ---
+// --- Main App Logic ---
 
-// Global variables for key, page, and WebSocket
-const page = new URLSearchParams(window.location.search).get('page') || '1';
-const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-const ws = new WebSocket(`${wsProtocol}${window.location.host}?key=${key}&page=${page}`);
-
-ws.onmessage = event => {
-    if (page === '1') {
-        const post = JSON.parse(event.data);
-        const postElement = createPostElement(post);
-        const feed = document.getElementById('feed');
-        feed.prepend(postElement);
-        if (feed.children.length > 10) {
-            feed.lastChild.remove();
-        }
+async function initializeApp() {
+  try {
+    const res = await fetch("/api/session");
+    const data = await res.json();
+    if (data.loggedIn) {
+      currentUserRole = data.role;
+      renderMainLayout(); // Render the main app structure
+      await fetchAndRenderPosts(currentPage);
+      setupWebSocket();
+    } else {
+      renderLogin();
     }
-};
+  } catch (error) {
+    console.error("Could not verify session", error);
+    renderLogin();
+  }
+}
 
-function createPostElement(post) {
-    const isImage = post.text.match(/\.(jpeg|jpg|gif|png|webp|avif|bmp)(\?|$)/i) != null || post.text.includes('pbs.twimg.com/media/');
-    const content = isImage
-        ? `<a href="${post.text}" target="_blank"><img src="${post.text}" loading="lazy"></a>`
-        : post.text.includes('http')
-            ? `<a href="${post.text}" target="_blank">${post.text}</a>`
-            : post.text;
-
-    const item = document.createElement('div');
-    item.className = 'item';
-    item.innerHTML = `
-        <div class="subject">
-            <div class="content">${content}</div>
-            <div class="date">${post.timestamp}</div>
+// Function to render the overall app structure (called once on login/session check)
+function renderMainLayout() {
+  const container = document.querySelector(".container");
+  container.innerHTML = `
+        <div id="form-container"></div>
+        <div id="feed"></div>
+        <div id="archive-container"></div>
+        <div id="logout-container" style="text-align: center; margin-top: 20px;">
+            <a href="#" id="logout">Close space</a>
         </div>
     `;
-    return item;
+  // Attach event listener for the logout button only once
+  document.getElementById("logout").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" });
+    renderLogin();
+  });
 }
 
-// Function to handle post submission
-async function submitPost(e) {
+function renderLogin() {
+  const container = document.querySelector(".container");
+  container.innerHTML = `
+        <div class="login-container">
+            <h1>Space Closed</h1>
+            <p>This space is personal and intentional.</p>
+            <p>Nothing is wrong.<br />You've just reached a private page.</p>
+            <form id="loginForm">
+                <div class="login-key">
+                    <input type="password" id="apiKeyInput" placeholder="If you have a key, enter it here." required />
+                    <button type="submit">Open</button>
+                </div>
+                <div class="remember-me">
+                    <label class="checkbox">
+                        <input type="checkbox" id="rememberMe" checked>
+                        <span>Keep space open</span>
+                    </label>
+                </div>
+            </form>
+        </div>
+    `;
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const input = document.getElementById('postInput');
-    const text = input.value;
-
-    if (!text) return; // Do not submit if input is empty
+    const apiKey = document.getElementById("apiKeyInput").value;
+    const rememberMe = document.getElementById("rememberMe").checked;
 
     try {
-        const res = await fetch(`/api/posts?key=${key}`, { // 'key' is now accessible
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
-        });
-        if (res.ok) {
-            input.value = '';
-            input.placeholder = "What's on your mind?";
-        } else {
-            console.error('Post submission failed:', res.statusText);
-            input.placeholder = "Submission failed. Please try again.";
-        }
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey, rememberMe }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        currentUserRole = data.role;
+        renderMainLayout(); // Render the main app structure
+        await fetchAndRenderPosts(currentPage);
+        setupWebSocket();
+      } else {
+        alert("Login failed: Invalid Key");
+      }
     } catch (error) {
-        console.error('Post submission failed:', error);
-        input.placeholder = "Submission failed. Please try again.";
+      alert("Login failed: Server error");
     }
+  });
 }
 
-// Event listeners for form and input field
-const postForm = document.getElementById('postForm');
-const postInput = document.getElementById('postInput');
+async function fetchAndRenderPosts(page) {
+  try {
+    const res = await fetch(`/api/posts?page=${page}`);
+    if (!res.ok) throw new Error("Failed to fetch posts");
 
-if (postForm && postInput) {
-    postForm.addEventListener('submit', submitPost);
-
-    postInput.addEventListener('paste', async (e) => {
-        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-        let imageFound = false;
-        for (const item of items) {
-            if (item.type.indexOf('image') === 0) {
-                imageFound = true;
-                e.preventDefault();
-                const blob = item.getAsFile();
-                const formData = new FormData();
-                formData.append('image', blob);
-
-                try {
-                    const res = await fetch(`/api/upload?key=${key}`, { // Ensure 'key' is accessible
-                        method: 'POST',
-                        body: formData
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.success) {
-                        postInput.value = window.location.origin + data.url;
-                        postInput.placeholder = "What's on your mind?"; // Reset placeholder on success
-                    } else {
-                        postInput.value = '';
-                        postInput.placeholder = data.message || "Upload failed. Please try again.";
-                    }
-                } catch (error) {
-                    console.error('Image upload failed:', error);
-                    postInput.value = '';
-                    postInput.placeholder = "Upload failed. Please try again.";
-                }
-            }
-        }
-    });
-
-    // Reset placeholder when user starts typing or focuses
-    postInput.addEventListener('focus', () => {
-        postInput.placeholder = "What's on your mind?";
-    });
-    postInput.addEventListener('input', () => {
-        // Only reset if it's an error message
-        if (postInput.placeholder.includes('failed')) {
-            postInput.placeholder = "What's on your mind?";
-        }
-    });
-
-    // Blur postInput when clicking outside of it or its form
-    document.addEventListener('click', (e) => {
-        if (!postInput.contains(e.target) && !postForm.contains(e.target)) {
-            postInput.blur();
-        }
-    });
+    const data = await res.json();
+    renderApp(data);
+  } catch (error) {
+    console.error("Error fetching posts:", error);
+  }
 }
+
+function renderApp(data) {
+  const formContainer = document.getElementById("form-container");
+  if (data.isEdit && formContainer) {
+    formContainer.innerHTML = `
+            <form id="postForm">
+                <input type="text" id="postInput" placeholder="What's on your mind?" required />
+                <button type="submit">Share</button>
+            </form>
+        `;
+    setupFormEventListeners();
+  } else if (formContainer) {
+    formContainer.innerHTML = ""; // Clear form container if not in edit mode
+  }
+
+  const feed = document.getElementById("feed");
+  if (feed) {
+    feed.innerHTML = data.posts.map(createPostElement).join("");
+  }
+
+  // Render pagination
+  const archiveContainer = document.getElementById("archive-container");
+  if (archiveContainer) {
+    const pageLinks = [];
+    if (data.hasOlder) {
+      pageLinks.push(`<a href="#" id="older">Older</a>`);
+    }
+    if (data.hasNewer) {
+      pageLinks.push(`<a href="#" id="newer">Newer</a>`);
+    }
+    // Only render archive div if there are actual links
+    archiveContainer.innerHTML = pageLinks.length > 0 ? `<div class="archive">${pageLinks.join('<div class="spacer"></div>')}</div>` : '';
+
+    setupPaginationEventListeners(data);
+  }
+}
+
+
+// --- Event Listeners & Element Creation ---
+
+function setupFormEventListeners() {
+  const postForm = document.getElementById("postForm");
+  const postInput = document.getElementById("postInput");
+  if (!postForm || !postInput) return;
+
+  postForm.addEventListener("submit", submitPost);
+  postInput.addEventListener("paste", handlePaste);
+
+  // Re-add listeners to manage placeholder text
+  postInput.addEventListener('focus', () => {
+    postInput.placeholder = "What's on your mind?";
+  });
+
+  postInput.addEventListener('input', () => {
+    if (postInput.placeholder.includes('failed')) {
+      postInput.placeholder = "What's on your mind?";
+    }
+  });
+}
+
+function setupPaginationEventListeners(data) {
+  const olderButton = document.getElementById("older");
+  if (olderButton) {
+    olderButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      currentPage = data.page + 1;
+      fetchAndRenderPosts(currentPage);
+      // Update URL without reloading
+      history.pushState({ page: currentPage }, '', `/?page=${currentPage}`);
+    });
+  }
+
+  const newerButton = document.getElementById("newer");
+  if (newerButton) {
+    newerButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      currentPage = data.page - 1;
+      fetchAndRenderPosts(currentPage);
+      // Update URL without reloading
+      history.pushState({ page: currentPage }, '', `/?page=${currentPage}`);
+    });
+  }
+}
+
+async function submitPost(e) {
+  e.preventDefault();
+  const input = document.getElementById("postInput");
+  const text = input.value;
+  if (!text) return;
+
+  try {
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (res.ok) {
+      input.value = "";
+    } else {
+      console.error("Post submission failed");
+    }
+  } catch (error) {
+    console.error("Post submission failed:", error);
+  }
+}
+
+async function handlePaste(e) {
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  for (const item of items) {
+    if (item.type.indexOf("image") === 0) {
+      e.preventDefault();
+      const blob = item.getAsFile();
+      const formData = new FormData();
+      formData.append("image", blob);
+
+      try {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          document.getElementById("postInput").value =
+            window.location.origin + data.url;
+        } else {
+          console.error("Upload failed:", data.message);
+          const postInput = document.getElementById("postInput");
+          if (postInput) {
+            postInput.value = '';
+            postInput.placeholder = data.message || "Upload failed. Please try again.";
+          }
+        }
+      } catch (error) {
+        console.error("Image upload failed:", error);
+      }
+    }
+  }
+}
+
+function createPostElement(post) {
+  const isImage =
+    post.text.match(/\.(jpeg|jpg|gif|png|webp|avif|bmp)(\?|$)/i) != null ||
+    post.text.includes("pbs.twimg.com/media/");
+  const content = isImage
+    ? `<a href="${post.text}" target="_blank"><img src="${post.text}" loading="lazy"></a>`
+    : post.text.includes("http")
+    ? `<a href="${post.text}" target="_blank">${post.text}</a>`
+    : post.text;
+
+  return `
+        <div class="item">
+            <div class="subject">
+                <div class="content">${content}</div>
+                <div class="date">${post.timestamp}</div>
+            </div>
+        </div>`;
+}
+
+// --- WebSocket Logic ---
+
+function setupWebSocket() {
+  const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+  const ws = new WebSocket(`${wsProtocol}${window.location.host}`);
+
+  ws.onmessage = (event) => {
+    if (currentPage === 1) {
+      const post = JSON.parse(event.data);
+      const feed = document.getElementById("feed");
+      if (feed) {
+        feed.insertAdjacentHTML("afterbegin", createPostElement(post));
+        if (feed.children.length > 10) {
+          feed.lastChild.remove();
+        }
+      }
+    }
+  };
+
+  ws.onclose = () => {
+    console.log("WebSocket disconnected. Attempting to reconnect...");
+    setTimeout(setupWebSocket, 3000);
+  };
+
+  ws.onerror = (err) => {
+    console.error("WS: WebSocket error:", err);
+  };
+}
+
+// --- Initial Load ---
+
+document.addEventListener("DOMContentLoaded", initializeApp);
+
+// Handle browser back/forward buttons
+window.addEventListener('popstate', (event) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const pageFromUrl = parseInt(urlParams.get('page') || '1', 10);
+    
+    if (pageFromUrl !== currentPage) {
+        currentPage = pageFromUrl;
+        fetchAndRenderPosts(currentPage);
+    }
+});

@@ -1,21 +1,44 @@
 const http = require("http");
 const WebSocket = require("ws");
+const session = require('express-session');
 
 require("dotenv").config();
+
+// Fail fast if the session secret is not configured
+if (!process.env.SESSION_SECRET) {
+    console.error("FATAL ERROR: SESSION_SECRET is not defined in your .env file.");
+    process.exit(1);
+}
+
 const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const sanitizeHtml = require('sanitize-html');
-const generateHTML = require("./app.js");
 const app = express();
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// Session Configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // Use 'auto' if your setup supports it, or handle proxy
+    sameSite: 'lax'
+  }
+}));
+
 wss.on("connection", (ws) => {
+  console.log('WSS: Client connected.');
   ws.on("message", (message) => {
     console.log("received: %s", message);
+  });
+  ws.on('close', () => {
+    console.log('WSS: Client disconnected.');
   });
 });
 
@@ -48,23 +71,65 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-const checkAuth = (req, res, next) => {
-    const key = req.query.key || req.headers['x-api-key'];
-    if (key === process.env.PRIVATE_KEY) {
-        req.isEdit = true;
-        next();
-    } else if (key === process.env.PUBLIC_KEY) {
-        req.isEdit = false;
-        if (req.method === 'POST') {
-            return res.status(403).send('Unauthorized');
-        }
-        next();
-    } else {
-        const errorPage = fs.readFileSync(path.join(__dirname, 'public', 'templates', '403.html'), 'utf8');
-        res.status(403).send(errorPage);
+// --- NEW AUTH LOGIC ---
+
+app.post('/api/login', (req, res) => {
+    const { apiKey, rememberMe } = req.body;
+    let role = null;
+
+    if (apiKey === process.env.PRIVATE_KEY) {
+        role = 'edit';
+    } else if (apiKey === process.env.PUBLIC_KEY) {
+        role = 'view';
     }
+
+    if (role) {
+        req.session.role = role;
+        if (rememberMe) {
+            // Set a persistent cookie (e.g., 30 days)
+            req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
+        }
+        // Otherwise, it's a session cookie that expires on browser close
+        res.json({ success: true, role: role });
+    } else {
+        res.status(401).json({ success: false, message: 'Invalid API Key' });
+    }
+});
+
+app.post('/api/logout', (req, res) => {
+    req.session.destroy(err => {
+        if (err) {
+            return res.status(500).json({ success: false, message: 'Could not log out.' });
+        }
+        res.clearCookie('connect.sid'); // The default session cookie name
+        res.json({ success: true });
+    });
+});
+
+app.get('/api/session', (req, res) => {
+    if (req.session && req.session.role) {
+        res.json({ loggedIn: true, role: req.session.role });
+    } else {
+        res.json({ loggedIn: false, role: null });
+    }
+});
+
+const checkSession = (req, res, next) => {
+    if (req.session && req.session.role) {
+        return next();
+    }
+    res.status(403).json({ success: false, message: 'Unauthorized' });
 };
 
+const checkEditAccess = (req, res, next) => {
+    if (req.session && req.session.role === 'edit') {
+        return next();
+    }
+    res.status(403).json({ success: false, message: 'Forbidden' });
+};
+
+
+// --- DATABASE ---
 const db = {
   get: () => inMemoryPosts, // Read from memory
   save: (file, data) => {
@@ -76,8 +141,14 @@ const db = {
 // Load initial posts into memory
 let inMemoryPosts = JSON.parse(fs.existsSync('posts.json') ? fs.readFileSync('posts.json', 'utf8') : '[]');
 
-app.get("/", checkAuth, (req, res) => {
-  const allPosts = db.get(); // Use the in-memory cache
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'templates', 'index.html'));
+});
+
+// --- API ROUTES ---
+
+app.get("/api/posts", checkSession, (req, res) => {
+  const allPosts = db.get();
   const postsPerPage = 10;
   const totalPages = Math.ceil(allPosts.length / postsPerPage);
   let page = parseInt(req.query.page || "1", 10);
@@ -94,17 +165,21 @@ app.get("/", checkAuth, (req, res) => {
   const hasOlder = end < allPosts.length;
   const hasNewer = page > 1;
 
-  res.send(
-    generateHTML(posts, req.query.key, req.isEdit, hasOlder, hasNewer, page)
-  );
+  res.json({
+    posts,
+    isEdit: req.session.role === 'edit',
+    hasOlder,
+    hasNewer,
+    page,
+  });
 });
 
-app.post("/api/upload", checkAuth, upload.single("image"), (req, res) => {
+app.post("/api/upload", checkEditAccess, upload.single("image"), (req, res) => {
   res.json({ success: true, url: `/uploads/${req.file.filename}` });
 });
 
-app.post("/api/posts", checkAuth, (req, res) => {
-  const posts = db.get(); // Use the in-memory cache
+app.post("/api/posts", checkEditAccess, (req, res) => {
+  const posts = db.get();
   const sanitizedText = sanitizeHtml(req.body.text, {
     allowedTags: [],
     allowedAttributes: {},
@@ -118,8 +193,9 @@ app.post("/api/posts", checkAuth, (req, res) => {
     }),
   };
   posts.unshift(newPost);
-  db.save("posts.json", posts); // This will update both memory and disk
+  db.save("posts.json", posts);
 
+  console.log(`WSS: Broadcasting new post to ${wss.clients.size} clients.`);
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify(newPost));

@@ -1,3 +1,7 @@
+:root {
+  --icon-checkbox: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='rgb(255, 255, 255)' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
 body {
   margin: 50px 30px;
   font-family: "Helvetica Neue", Arial, sans-serif;
@@ -20,7 +24,19 @@ form {
   gap: 0.5rem;
   margin-bottom: 80px;
 }
-input {
+#postForm {
+  flex-direction: row;
+}
+#loginForm {
+  flex-direction: column;
+  margin-top: 30px;
+}
+#loginForm .login-key {
+  display: flex;
+  gap: 0.5rem;
+}
+input[type="text"],
+input[type="password"] {
   flex-grow: 1;
   border: 1px solid rgba(0, 0, 0, 0.5);
   border-radius: 14px;
@@ -86,4 +102,55 @@ a {
   justify-content: center;
   align-items: center;
   margin-top: 20px;
+}
+
+/* Checkbox */
+:root {
+  --icon-checkbox: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='rgb(255, 255, 255)' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+label.checkbox {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  background: white;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 80% 80%;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-block;
+  height: 14px;
+  width: 14px;
+  vertical-align: middle;
+  margin: 0;
+  outline: none;
+}
+
+/* Hover and Focus States */
+input[type="checkbox"]:focus {
+  border-color: #000;
+}
+
+/* Hover and Focus States */
+input[type="checkbox"]:hover {
+  opacity: 0.75;
+}
+
+/* Checked State */
+input[type="checkbox"]:checked {
+  background-color: #000;
+  background-image: var(--icon-checkbox);
+}
+
+/* Disabled State */
+input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
