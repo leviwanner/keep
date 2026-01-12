@@ -91,17 +91,18 @@ mkdir -p keep/public/uploads
 ### 5. Project Structure (Overview)
 
 ```
-keep-journal/
+keep/
 ├── public/
-│   ├── client.js          # Client-side JavaScript logic
-│   ├── manifest.json      # PWA manifest configuration
-│   ├── sw.js              # Service Worker (for caching and PWA features)
+│   ├── static/            # Holds static assets like the favicon and PWA icons
 │   ├── styles/
 │   │   └── style.css      # Application styles
 │   ├── templates/
 │   │   └── index.html     # HTML template
-│   └── uploads/           # Image storage
-├── app.js                 # HTML generation logic (server-side)
+│   ├── uploads/           # Image storage
+│   ├── client.js          # Client-side JavaScript logic
+│   ├── manifest.json      # PWA manifest configuration
+│   ├── robots.txt         # Block certain bots
+│   └── sw.js              # Service Worker (for caching and PWA features)
 ├── posts.json             # Flat-file database for posts
 ├── server.js              # Express server, API endpoints, WebSocket server
 └── .env                   # Environment variables (keys, VAPID)
@@ -119,10 +120,10 @@ The server will start on `http://localhost:3000`.
 
 ### Accessing the Journal
 
-- **Edit Access:** Navigate to `http://localhost:3000/?key=YOUR_SUPER_SECRET_EDIT_PASSWORD`
-- **View-Only Access:** Navigate to `http://localhost:3000/?key=YOUR_SUPER_SECRET_VIEW_PASSWORD`
+- **Edit Access:** Navigate to `http://localhost:3000` and input your key `YOUR_SUPER_SECRET_EDIT_KEY`
+- **View-Only Access:** Navigate to `http://localhost:3000` and input your key `YOUR_SUPER_SECRET_VIEW_KEY`
 
-Replace `YOUR_SUPER_SECRET_EDIT_PASSWORD` and `YOUR_SUPER_SECRET_VIEW_PASSWORD` with the actual keys from your `.env` file.
+Replace `YOUR_SUPER_SECRET_EDIT_KEY`, `YOUR_SUPER_SECRET_VIEW_KEY`, and `YOUR_SESSION_SECRET` with the actual keys from your `.env` file.
 
 ### Posting Entries
 
