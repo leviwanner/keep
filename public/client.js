@@ -147,10 +147,10 @@ function renderApp(data) {
     // Display pagination only if there are older or newer pages.
     if (data.hasOlder || data.hasNewer) {
       const olderLink = data.hasOlder
-        ? `<a href="#" id="older">Older</a>`
+        ? `<button id="older">Older</button>`
         : "<div></div>";
       const newerLink = data.hasNewer
-        ? `<a href="#" id="newer">Newer</a>`
+        ? `<button id="newer">Newer</button>`
         : "<div></div>";
       const spacer = `<div class="spacer"></div>`;
       archiveContainer.innerHTML = `
