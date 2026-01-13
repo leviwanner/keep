@@ -2,6 +2,7 @@
 const http = require("http");
 const WebSocket = require("ws");
 const session = require('express-session');
+const FileStore = require('session-file-store')(session); // Add this line
 
 // Load environment variables from a .env file for configuration.
 require("dotenv").config();
@@ -26,8 +27,10 @@ const server = http.createServer(app);
 // Initialize a WebSocket server and attach it to the HTTP server.
 const wss = new WebSocket.Server({ server });
 
-// Configure session management for the Express app.
+// Configure session management for the Express app, using a file-based store.
+const fileStoreOptions = {};
 app.use(session({
+  store: new FileStore(fileStoreOptions), // Use session-file-store for persistence.
   secret: process.env.SESSION_SECRET, // A secret key for signing the session ID cookie.
   resave: false, // Don't save session if unmodified.
   saveUninitialized: false, // Don't create session until something stored.
