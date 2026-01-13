@@ -310,7 +310,7 @@ function setupWebSocket() {
     // If a new post is received and the user is on the first page,
     // refresh the posts to ensure the view and pagination are up-to-date.
     if (currentPage === 1) {
-        fetchAndRenderPosts(currentPage);
+      fetchAndRenderPosts(currentPage);
     }
   };
 
@@ -331,21 +331,30 @@ function setupWebSocket() {
 
 // Initial setup when the DOM is fully loaded.
 document.addEventListener("DOMContentLoaded", () => {
-    initializeApp();
+  initializeApp();
 
-    // Add a global click listener to improve UI on mobile devices.
-    document.addEventListener('click', (event) => {
-        // If the user clicks on a non-interactive area, remove focus from the active element.
-        // This is useful for dismissing virtual keyboards on mobile.
-        if (!event.target.closest('input, button, a, [onclick]')) {
-            if (document.activeElement) {
-                document.activeElement.blur();
-            }
-        }
-    });
+  // Add a global click listener to improve UI on mobile devices.
+  document.addEventListener("click", (event) => {
+    // If the user clicks on a non-interactive area, remove focus from the active element.
+    // This is useful for dismissing virtual keyboards on mobile.
+    if (!event.target.closest("input, button, a, [onclick]")) {
+      if (document.activeElement) {
+        document.activeElement.blur();
+      }
+    }
+  });
+
+  // --- Page Visibility API ---
+  // Listen for changes in document visibility to refresh posts when the app comes to foreground.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      console.log("App has come to foreground, refreshing posts.");
+      fetchAndRenderPosts(currentPage);
+    }
+  });
 });
 
-// Handle the browser's back and forward buttons.
+// Handle browser back/forward buttons
 window.addEventListener("popstate", (event) => {
   const urlParams = new URLSearchParams(window.location.search);
   const pageFromUrl = parseInt(urlParams.get("page") || "1", 10);
