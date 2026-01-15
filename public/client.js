@@ -91,6 +91,7 @@ function renderLogin() {
 
 // Fetches posts from the server and triggers the rendering process.
 async function fetchAndRenderPosts(page) {
+  window.scrollTo(0, 0);
   try {
     const res = await fetch(`/api/posts?page=${page}`);
     if (!res.ok) throw new Error("Failed to fetch posts");
