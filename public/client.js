@@ -24,7 +24,13 @@ async function initializeApp() {
     // If the user is logged in, set up the main application.
     if (data.loggedIn) {
       currentUserRole = data.role;
-      renderMainLayout(); // Render the main UI structure.
+      document
+        .querySelector(".link-logout")
+        .addEventListener("click", async (e) => {
+          e.preventDefault();
+          await fetch("/api/logout", { method: "POST" });
+          window.location.reload(); // Reload the page to show the login screen.
+        });
       await fetchAndRenderPosts(currentPage); // Fetch and display posts.
       setupWebSocket(); // Establish a WebSocket connection.
     } else {
@@ -37,47 +43,24 @@ async function initializeApp() {
   }
 }
 
-// Renders the basic HTML structure of the main application.
-function renderMainLayout() {
-  const container = document.querySelector(".container");
-  container.innerHTML = `
-        <div id="form-container"></div>
-        <div id="feed"></div>
-        <div id="archive-container"></div>
-        <div id="logout-container" style="text-align: center; margin-top: 20px;">
-            <a href="#" id="logout">Close space</a>
-        </div>
-    `;
-  // Add a one-time event listener for the logout button.
-  document.getElementById("logout").addEventListener("click", async (e) => {
-    e.preventDefault();
-    await fetch("/api/logout", { method: "POST" });
-    window.location.reload(); // Reload the page to show the login screen.
-  });
-}
-
 // Renders the login form.
 function renderLogin() {
   const container = document.querySelector(".container");
   container.innerHTML = `
-        <div class="login-container">
-            <h1>Space Closed</h1>
-            <p>This space is personal and intentional.</p>
-            <p>Nothing is wrong.<br />You've just reached a private page.</p>
-            <form id="loginForm">
+              <h1>Space Closed</h1>
+              <p>This space is personal and intentional.</p>
+              <p>Nothing is wrong.<br />You've just reached a private page.</p>
+              <form class="login-form" id="loginForm">
                 <div class="login-key">
-                    <input type="password" id="apiKeyInput" placeholder="If you have a key, enter it here." required />
-                    <button type="submit">Open</button>
+                  <input type="password" class="input-password" id="apiKeyInput" placeholder="If you have a key, enter it here." required>
+                  <button type="submit" class="btn">Open</button>
                 </div>
-                <div class="remember-me">
-                    <label class="checkbox">
-                        <input type="checkbox" id="rememberMe" checked>
-                        <span>Keep space open</span>
-                    </label>
-                </div>
-            </form>
-        </div>
-    `;
+                <label class="checkbox-container">
+                  <input type="checkbox" id="rememberMe" class="checkbox-input" checked>
+                  <span>Keep space open</span>
+                </label>
+              </form>
+      `;
   // Add an event listener for the login form submission.
   document.getElementById("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -93,8 +76,8 @@ function renderLogin() {
       });
 
       if (res.ok) {
-        // If login is successful, initialize the main application.
-        initializeApp();
+        // If login is successful, reload the page.
+        window.location.reload();
       } else {
         alert("Login failed: Invalid Key");
       }
@@ -121,18 +104,16 @@ async function fetchAndRenderPosts(page) {
 
 // Renders the main application components (form, feed, pagination).
 function renderApp(data) {
-  const formContainer = document.getElementById("form-container");
+  const postForm = document.getElementById("postForm");
   // Display the post creation form only if the user has "edit" rights.
-  if (data.isEdit && formContainer) {
-    formContainer.innerHTML = `
-            <form id="postForm">
-                <input type="text" id="postInput" placeholder="What's on your mind?" required />
-                <button type="submit">Share</button>
-            </form>
-        `;
+  if (data.isEdit && postForm) {
+    postForm.innerHTML = `
+          <input type="text" id="postInput" class="input-text" placeholder="What's on your mind?" required aria-label="Post content">
+          <button type="submit" class="btn">Share</button>
+          `;
     setupFormEventListeners(); // Set up event listeners for the form.
-  } else if (formContainer) {
-    formContainer.innerHTML = ""; // Clear the form container if not in edit mode.
+  } else if (postForm) {
+    postForm.innerHTML = ""; // Clear the form container if not in edit mode.
   }
 
   // Render the feed of posts.
@@ -142,27 +123,30 @@ function renderApp(data) {
   }
 
   // Render the pagination controls.
-  const archiveContainer = document.getElementById("archive-container");
-  if (archiveContainer) {
-    // Display pagination only if there are older or newer pages.
-    if (data.hasOlder || data.hasNewer) {
-      const olderLink = data.hasOlder
-        ? `<button id="older">Older</button>`
-        : "<div></div>";
-      const newerLink = data.hasNewer
-        ? `<button id="newer">Newer</button>`
-        : "<div></div>";
-      const spacer = `<div class="spacer"></div>`;
-      archiveContainer.innerHTML = `
-        <div class="archive">
-          ${olderLink}
-          ${spacer}
-          ${newerLink}
-        </div>`;
-    } else {
-      archiveContainer.innerHTML = ""; // Clear pagination if not needed.
+  let paginationContainer = document.getElementById("pagination");
+  if (data.hasOlder || data.hasNewer) {
+    if (!paginationContainer) {
+      paginationContainer = document.createElement("nav");
+      paginationContainer.id = "pagination";
+      paginationContainer.className = "pagination";
+      const footer = document.querySelector(".footer-nav");
+      footer.parentNode.insertBefore(paginationContainer, footer);
     }
-    setupPaginationEventListeners(data); // Set up event listeners for pagination.
+    const prevLink = data.hasNewer
+      ? `<button class="btn" id="previous">Previous</button>`
+      : "<div></div>";
+    const nextLink = data.hasOlder
+      ? `<button class="btn" id="next">Next</button>`
+      : "<div></div>";
+    const spacer = `<div class="pagination-spacer" role="presentation"></div>`;
+    paginationContainer.innerHTML = `
+          ${prevLink}
+          ${spacer}
+          ${nextLink}
+        `;
+    setupPaginationEventListeners(data);
+  } else if (paginationContainer) {
+    paginationContainer.remove();
   }
 }
 
@@ -192,22 +176,22 @@ function setupFormEventListeners() {
 
 // Sets up event listeners for the pagination controls.
 function setupPaginationEventListeners(data) {
-  const olderButton = document.getElementById("older");
-  if (olderButton) {
-    olderButton.addEventListener("click", (e) => {
+  const prevButton = document.getElementById("previous");
+  if (prevButton) {
+    prevButton.addEventListener("click", (e) => {
       e.preventDefault();
-      currentPage = data.page + 1;
+      currentPage = data.page - 1;
       fetchAndRenderPosts(currentPage);
       // Update the URL to reflect the new page number.
       history.pushState({ page: currentPage }, "", `/?page=${currentPage}`);
     });
   }
 
-  const newerButton = document.getElementById("newer");
-  if (newerButton) {
-    newerButton.addEventListener("click", (e) => {
+  const nextButton = document.getElementById("next");
+  if (nextButton) {
+    nextButton.addEventListener("click", (e) => {
       e.preventDefault();
-      currentPage = data.page - 1;
+      currentPage = data.page + 1;
       fetchAndRenderPosts(currentPage);
       // Update the URL to reflect the new page number.
       history.pushState({ page: currentPage }, "", `/?page=${currentPage}`);
@@ -281,21 +265,20 @@ function createPostElement(post) {
   const isImage =
     post.text.match(/\.(jpeg|jpg|gif|png|webp|avif|bmp)(\?|$)/i) != null ||
     post.text.includes("pbs.twimg.com/media/");
+
   // Create the appropriate HTML content for the post.
-  const content = isImage
-    ? `<a href="${post.text}" target="_blank"><img src="${post.text}" loading="lazy"></a>`
+  const contentHTML = isImage
+    ? `<a href="${post.text}" target="_blank"><img src="${post.text}" alt="Thought image" loading="lazy"></a>`
     : post.text.includes("http")
     ? `<a href="${post.text}" target="_blank">${post.text}</a>`
     : post.text;
 
   // Return the complete HTML structure for the post.
   return `
-        <div class="item">
-            <div class="subject">
-                <div class="content">${content}</div>
-                <div class="date">${post.timestamp}</div>
-            </div>
-        </div>`;
+          <article class="feed-item">
+            <div class="feed-content">${contentHTML}</div>
+            <time class="feed-date" datetime="${post.isoTimestamp}">${post.timestamp}</time>
+          </article>`;
 }
 
 // --- WEBSOCKETS ---

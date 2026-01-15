@@ -1,16 +1,18 @@
 // Import necessary modules for creating an HTTP server, handling WebSockets, and managing sessions.
 const http = require("http");
 const WebSocket = require("ws");
-const session = require('express-session');
-const FileStore = require('session-file-store')(session); // Add this line
+const session = require("express-session");
+const FileStore = require("session-file-store")(session); // Add this line
 
 // Load environment variables from a .env file for configuration.
 require("dotenv").config();
 
 // Fail fast if the session secret is not configured, ensuring the application is secure.
 if (!process.env.SESSION_SECRET) {
-    console.error("FATAL ERROR: SESSION_SECRET is not defined in your .env file.");
-    process.exit(1);
+  console.error(
+    "FATAL ERROR: SESSION_SECRET is not defined in your .env file."
+  );
+  process.exit(1);
 }
 
 // Import additional modules for building the Express application.
@@ -18,7 +20,7 @@ const express = require("express");
 const multer = require("multer"); // For handling file uploads.
 const fs = require("fs"); // For interacting with the file system.
 const path = require("path"); // For handling file and directory paths.
-const sanitizeHtml = require('sanitize-html'); // For cleaning up user-submitted HTML.
+const sanitizeHtml = require("sanitize-html"); // For cleaning up user-submitted HTML.
 
 // Initialize the Express application and create an HTTP server.
 const app = express();
@@ -29,28 +31,30 @@ const wss = new WebSocket.Server({ server });
 
 // Configure session management for the Express app, using a file-based store.
 const fileStoreOptions = {};
-app.use(session({
-  store: new FileStore(fileStoreOptions), // Use session-file-store for persistence.
-  secret: process.env.SESSION_SECRET, // A secret key for signing the session ID cookie.
-  resave: false, // Don't save session if unmodified.
-  saveUninitialized: false, // Don't create session until something stored.
-  cookie: {
-    httpOnly: true, // Prevent client-side JS from accessing the cookie.
-    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production.
-    sameSite: 'lax' // A balanced approach to CSRF protection.
-  }
-}));
+app.use(
+  session({
+    store: new FileStore(fileStoreOptions), // Use session-file-store for persistence.
+    secret: process.env.SESSION_SECRET, // A secret key for signing the session ID cookie.
+    resave: false, // Don't save session if unmodified.
+    saveUninitialized: false, // Don't create session until something stored.
+    cookie: {
+      httpOnly: true, // Prevent client-side JS from accessing the cookie.
+      secure: process.env.NODE_ENV === "production", // Use secure cookies in production.
+      sameSite: "lax", // A balanced approach to CSRF protection.
+    },
+  })
+);
 
 // Handle new WebSocket connections.
 wss.on("connection", (ws) => {
-  console.log('WSS: Client connected.');
+  console.log("WSS: Client connected.");
   // Handle incoming messages from clients.
   ws.on("message", (message) => {
     console.log("received: %s", message);
   });
   // Handle WebSocket client disconnection.
-  ws.on('close', () => {
-    console.log('WSS: Client disconnected.');
+  ws.on("close", () => {
+    console.log("WSS: Client disconnected.");
   });
 });
 
@@ -95,73 +99,74 @@ app.use((err, req, res, next) => {
 // --- AUTHENTICATION ---
 
 // API endpoint for user login.
-app.post('/api/login', (req, res) => {
-    const { apiKey, rememberMe } = req.body;
-    let role = null;
+app.post("/api/login", (req, res) => {
+  const { apiKey, rememberMe } = req.body;
+  let role = null;
 
-    // Determine the user's role based on the provided API key.
-    if (apiKey === process.env.PRIVATE_KEY) {
-        role = 'edit';
-    } else if (apiKey === process.env.PUBLIC_KEY) {
-        role = 'view';
-    }
+  // Determine the user's role based on the provided API key.
+  if (apiKey === process.env.PRIVATE_KEY) {
+    role = "edit";
+  } else if (apiKey === process.env.PUBLIC_KEY) {
+    role = "view";
+  }
 
-    if (role) {
-        // Store the user's role in the session.
-        req.session.role = role;
-        // If "remember me" is checked, set a persistent cookie.
-        if (rememberMe) {
-            req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
-        }
-        // Respond with success and the user's role.
-        res.json({ success: true, role: role });
-    } else {
-        // Respond with an error for invalid API keys.
-        res.status(401).json({ success: false, message: 'Invalid API Key' });
+  if (role) {
+    // Store the user's role in the session.
+    req.session.role = role;
+    // If "remember me" is checked, set a persistent cookie.
+    if (rememberMe) {
+      req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
     }
+    // Respond with success and the user's role.
+    res.json({ success: true, role: role });
+  } else {
+    // Respond with an error for invalid API keys.
+    res.status(401).json({ success: false, message: "Invalid API Key" });
+  }
 });
 
 // API endpoint for user logout.
-app.post('/api/logout', (req, res) => {
-    // Destroy the user's session.
-    req.session.destroy(err => {
-        if (err) {
-            return res.status(500).json({ success: false, message: 'Could not log out.' });
-        }
-        // Clear the session cookie.
-        res.clearCookie('connect.sid');
-        res.json({ success: true });
-    });
+app.post("/api/logout", (req, res) => {
+  // Destroy the user's session.
+  req.session.destroy((err) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Could not log out." });
+    }
+    // Clear the session cookie.
+    res.clearCookie("connect.sid");
+    res.json({ success: true });
+  });
 });
 
 // API endpoint to check the current session status.
-app.get('/api/session', (req, res) => {
-    // Check if a session exists and has a role.
-    if (req.session && req.session.role) {
-        res.json({ loggedIn: true, role: req.session.role });
-    } else {
-        res.json({ loggedIn: false, role: null });
-    }
+app.get("/api/session", (req, res) => {
+  // Check if a session exists and has a role.
+  if (req.session && req.session.role) {
+    res.json({ loggedIn: true, role: req.session.role });
+  } else {
+    res.json({ loggedIn: false, role: null });
+  }
 });
 
 // Middleware to protect routes by checking for a valid session.
 const checkSession = (req, res, next) => {
-    if (req.session && req.session.role) {
-        return next(); // Continue to the next middleware if the session is valid.
-    }
-    // Respond with an error if the session is not valid.
-    res.status(403).json({ success: false, message: 'Unauthorized' });
+  if (req.session && req.session.role) {
+    return next(); // Continue to the next middleware if the session is valid.
+  }
+  // Respond with an error if the session is not valid.
+  res.status(403).json({ success: false, message: "Unauthorized" });
 };
 
 // Middleware to protect routes by checking for "edit" access rights.
 const checkEditAccess = (req, res, next) => {
-    if (req.session && req.session.role === 'edit') {
-        return next(); // Continue if the user has edit access.
-    }
-    // Respond with an error if the user does not have edit access.
-    res.status(403).json({ success: false, message: 'Forbidden' });
+  if (req.session && req.session.role === "edit") {
+    return next(); // Continue if the user has edit access.
+  }
+  // Respond with an error if the user does not have edit access.
+  res.status(403).json({ success: false, message: "Forbidden" });
 };
-
 
 // --- DATABASE ---
 
@@ -177,13 +182,15 @@ const db = {
 };
 
 // Load initial posts from "posts.json" into the in-memory store on server start.
-let inMemoryPosts = JSON.parse(fs.existsSync('posts.json') ? fs.readFileSync('posts.json', 'utf8') : '[]');
+let inMemoryPosts = JSON.parse(
+  fs.existsSync("posts.json") ? fs.readFileSync("posts.json", "utf8") : "[]"
+);
 
 // --- ROUTES ---
 
 // Serve the main application page.
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'templates', 'index.html'));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "templates", "index.html"));
 });
 
 // --- API ROUTES ---
@@ -203,7 +210,12 @@ app.get("/api/posts", checkSession, (req, res) => {
   // Calculate the start and end indices for the requested page.
   const start = (page - 1) * postsPerPage;
   const end = start + postsPerPage;
-  const posts = allPosts.slice(start, end);
+  const posts = allPosts.slice(start, end).map((post) => ({
+    ...post,
+    isoTimestamp: post.timestamp
+      ? new Date(post.timestamp).toISOString()
+      : new Date().toISOString(),
+  }));
 
   // Determine if there are older or newer posts for pagination links.
   const hasOlder = end < allPosts.length;
@@ -212,7 +224,7 @@ app.get("/api/posts", checkSession, (req, res) => {
   // Respond with the posts for the page and pagination metadata.
   res.json({
     posts,
-    isEdit: req.session.role === 'edit',
+    isEdit: req.session.role === "edit",
     hasOlder,
     hasNewer,
     page,
@@ -241,6 +253,7 @@ app.post("/api/posts", checkEditAccess, (req, res) => {
       day: "numeric",
       year: "numeric",
     }),
+    isoTimestamp: new Date().toISOString(),
   };
   // Add the new post to the beginning of the array.
   posts.unshift(newPost);
