@@ -210,12 +210,7 @@ app.get("/api/posts", checkSession, (req, res) => {
   // Calculate the start and end indices for the requested page.
   const start = (page - 1) * postsPerPage;
   const end = start + postsPerPage;
-  const posts = allPosts.slice(start, end).map((post) => ({
-    ...post,
-    isoTimestamp: post.timestamp
-      ? new Date(post.timestamp).toISOString()
-      : new Date().toISOString(),
-  }));
+  const posts = allPosts.slice(start, end);
 
   // Determine if there are older or newer posts for pagination links.
   const hasOlder = end < allPosts.length;

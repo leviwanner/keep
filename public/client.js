@@ -91,7 +91,6 @@ function renderLogin() {
 
 // Fetches posts from the server and triggers the rendering process.
 async function fetchAndRenderPosts(page) {
-  window.scrollTo(0, 0);
   try {
     const res = await fetch(`/api/posts?page=${page}`);
     if (!res.ok) throw new Error("Failed to fetch posts");
@@ -105,6 +104,7 @@ async function fetchAndRenderPosts(page) {
 
 // Renders the main application components (form, feed, pagination).
 function renderApp(data) {
+  window.scrollTo(0, 0);
   const postForm = document.getElementById("postForm");
   // Display the post creation form only if the user has "edit" rights.
   if (data.isEdit && postForm) {
