@@ -104,7 +104,6 @@ async function fetchAndRenderPosts(page) {
 
 // Renders the main application components (form, feed, pagination).
 function renderApp(data) {
-  window.scrollTo(0, 0);
   const postForm = document.getElementById("postForm");
   // Display the post creation form only if the user has "edit" rights.
   if (data.isEdit && postForm) {
@@ -179,10 +178,11 @@ function setupFormEventListeners() {
 function setupPaginationEventListeners(data) {
   const prevButton = document.getElementById("previous");
   if (prevButton) {
-    prevButton.addEventListener("click", (e) => {
+    prevButton.addEventListener("click", async (e) => {
       e.preventDefault();
       currentPage = data.page - 1;
-      fetchAndRenderPosts(currentPage);
+      await fetchAndRenderPosts(currentPage);
+      window.scrollTo(0, 0);
       // Update the URL to reflect the new page number.
       history.pushState({ page: currentPage }, "", `/?page=${currentPage}`);
     });
@@ -190,10 +190,11 @@ function setupPaginationEventListeners(data) {
 
   const nextButton = document.getElementById("next");
   if (nextButton) {
-    nextButton.addEventListener("click", (e) => {
+    nextButton.addEventListener("click", async (e) => {
       e.preventDefault();
       currentPage = data.page + 1;
-      fetchAndRenderPosts(currentPage);
+      await fetchAndRenderPosts(currentPage);
+      window.scrollTo(0, 0);
       // Update the URL to reflect the new page number.
       history.pushState({ page: currentPage }, "", `/?page=${currentPage}`);
     });
