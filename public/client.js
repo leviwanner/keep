@@ -263,17 +263,15 @@ async function handlePaste(e) {
 
 // Creates the HTML element for a single post.
 function createPostElement(post) {
-  // Check if the post text is an image URL.
+  // Check if the post text is an image URL (and ONLY that URL).
   const isImage =
-    post.text.match(/\.(jpeg|jpg|gif|png|webp|avif|bmp)(\?|$)/i) != null ||
-    post.text.includes("pbs.twimg.com/media/");
+    (post.text.match(/^https?:\/\/[^\s]+\.(jpeg|jpg|gif|png|webp|avif|bmp)(\?.*)?$/i) != null ||
+     post.text.match(/^https?:\/\/pbs\.twimg\.com\/media\/[^\s]+$/i) != null);
 
   // Create the appropriate HTML content for the post.
   const contentHTML = isImage
     ? `<a href="${post.text}" target="_blank"><img src="${post.text}" alt="Thought image" loading="lazy"></a>`
-    : post.text.includes("http")
-    ? `<a href="${post.text}" target="_blank">${post.text}</a>`
-    : post.text;
+    : post.text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
 
   // Return the complete HTML structure for the post.
   return `

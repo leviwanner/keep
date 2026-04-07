@@ -1,5 +1,5 @@
 // Define the cache name and the URLs to be cached.
-const CACHE_NAME = 'keep-journal-cache-v3';
+const CACHE_NAME = 'keep-journal-cache-v4';
 const urlsToCache = [
   '/',
   '/manifest.json',
