@@ -226,6 +226,51 @@ app.get("/api/posts", checkSession, (req, res) => {
   });
 });
 
+// API endpoint to generate an RSS feed for the most recent 20 posts.
+app.get("/feed/:token", (req, res) => {
+  const { token } = req.params;
+
+  // Check if the provided token matches the SHARE_TOKEN from environment variables.
+  if (token !== process.env.SHARE_TOKEN) {
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+
+  const allPosts = db.get();
+  // Retrieve the 20 most recent posts.
+  const recentPosts = allPosts.slice(0, 20);
+
+  // Construct the RSS XML manually to avoid adding new dependencies.
+  let rssXml = `<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+  <title>Journal Feed</title>
+  <link>${req.protocol}://${req.get("host")}</link>
+  <description>Latest updates from my journal</description>
+  <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+`;
+
+  recentPosts.forEach((post) => {
+    // Escape and wrap post text in CDATA to handle potential HTML and special characters.
+    const description = `<![CDATA[${post.text}]]>`;
+    const pubDate = new Date(post.isoTimestamp).toUTCString();
+
+    rssXml += `
+  <item>
+    <description>${description}</description>
+    <pubDate>${pubDate}</pubDate>
+    <guid isPermaLink="false">${post.isoTimestamp}</guid>
+  </item>`;
+  });
+
+  rssXml += `
+</channel>
+</rss>`;
+
+  // Set the response content type to RSS XML and send the payload.
+  res.set("Content-Type", "application/rss+xml");
+  res.send(rssXml);
+});
+
 // API endpoint to handle file uploads.
 app.post("/api/upload", checkEditAccess, upload.single("image"), (req, res) => {
   // Respond with the URL of the uploaded file.
