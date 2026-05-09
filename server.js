@@ -275,10 +275,6 @@ app.get("/feed/:token", (req, res) => {
 
     rssXml += `
   <item>
-    <title><![CDATA[${post.text.substring(0, 50)}${
-      post.text.length > 50 ? "..." : ""
-    }]]></title>
-    <link>${req.protocol}://${req.get("host")}</link>
     <description><![CDATA[${contentHTML}]]></description>
     <content:encoded><![CDATA[${contentHTML}]]></content:encoded>
     <pubDate>${pubDate}</pubDate>
