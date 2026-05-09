@@ -241,7 +241,7 @@ app.get("/feed/:token", (req, res) => {
 
   // Construct the RSS XML manually to avoid adding new dependencies.
   let rssXml = `<?xml version="1.0" encoding="UTF-8" ?>
-<rss version="2.0">
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
 <channel>
   <title>Journal Feed</title>
   <link>${req.protocol}://${req.get("host")}</link>
@@ -250,15 +250,39 @@ app.get("/feed/:token", (req, res) => {
 `;
 
   recentPosts.forEach((post) => {
-    // Escape and wrap post text in CDATA to handle potential HTML and special characters.
-    const description = `<![CDATA[${post.text}]]>`;
+    // Check if the post text is an image URL (and ONLY that URL).
+    const isImage =
+      post.text.match(
+        /^https?:\/\/[^\s]+\.(jpeg|jpg|gif|png|webp|avif|bmp)(\?.*)?$/i
+      ) != null ||
+      post.text.match(/^https?:\/\/pbs\.twimg\.com\/media\/[^\s]+$/i) != null;
+
+    // Create the appropriate HTML content for the RSS item, matching client.js logic.
+    let contentHTML = isImage
+      ? `<a href="${post.text}" target="_blank"><img src="${post.text}" alt="Keep Image" loading="lazy"></a>`
+      : post.text.replace(
+          /(https?:\/\/[^\s]+?)(?=[.,;!?]?(\s|$))/g,
+          '<a href="$1" target="_blank">$1</a>'
+        );
+
+    // Replace newlines with <br> for RSS readers to preserve formatting.
+    contentHTML = contentHTML.replace(/\n/g, "<br>");
+
     const pubDate = new Date(post.isoTimestamp).toUTCString();
+    const enclosure = isImage
+      ? `\n    <enclosure url="${post.text}" length="0" type="image/jpeg" />`
+      : "";
 
     rssXml += `
   <item>
-    <description>${description}</description>
+    <title><![CDATA[${post.text.substring(0, 50)}${
+      post.text.length > 50 ? "..." : ""
+    }]]></title>
+    <link>${req.protocol}://${req.get("host")}</link>
+    <description><![CDATA[${contentHTML}]]></description>
+    <content:encoded><![CDATA[${contentHTML}]]></content:encoded>
     <pubDate>${pubDate}</pubDate>
-    <guid isPermaLink="false">${post.isoTimestamp}</guid>
+    <guid isPermaLink="false">${post.isoTimestamp}</guid>${enclosure}
   </item>`;
   });
 

@@ -274,7 +274,7 @@ function createPostElement(post) {
   const contentHTML = isImage
     ? `<a href="${post.text}" target="_blank"><img src="${post.text}" alt="Keep Image" loading="lazy"></a>`
     : post.text.replace(
-        /(https?:\/\/[^\s]+)/g,
+        /(https?:\/\/[^\s]+?)(?=[.,;!?]?(\s|$))/g,
         '<a href="$1" target="_blank">$1</a>'
       );
 
